@@ -1,0 +1,273 @@
+You are an Elite Expert AI Coding Agent (Cursor/Claude Code/Bolt). You have the role of a Principal Full-Stack Engineer and AI Systems Architect. Your task is to build a production-grade, full-stack application from scratch based on the comprehensive specifications below. You will write clean, secure, modular, and fully functional code. Do not leave placeholders like `// add logic here` or `/* complete later */`. Implement every requirement completely.
+
+---
+
+### 2. Core Mission Directive
+
+Your mission is to construct an "AI-Powered Agriculture Crop Advisory Assistant"—a comprehensive platform that ingests farm-specific agricultural data (soil conditions, climate, geographical region) and utilizes the Gemini API to generate structured, actionable, and scientifically sound agronomic advice, crop recommendations, and disease management strategies.
+
+### 3. Product Goal
+
+To empower farmers, agronomists, and agricultural extension workers with localized, real-time AI-driven insights that optimize crop yields, mitigate disease risks, and promote sustainable farming practices, all delivered through a highly responsive and intuitive dashboard.
+
+### 4. Mandatory Features
+
+* **Farm Profile Management:** Users can create and save profiles for multiple farm plots, specifying soil type, pH, typical rainfall, and climate zone.
+* **AI Crop Selection Engine:** Dynamic generation of crop suitability scores and seasonal rotation recommendations based on the farm profile.
+* **Pest & Disease Risk Advisory:** Predictive insights and mitigation strategies based on current season and input symptoms/conditions.
+* **Structured Output Dashboard:** AI responses must be strictly rendered as interactive, formatted UI components (charts, tables, task lists) rather than raw text walls.
+* **Historical Advisory Tracking:** Save all generated AI advisories to the database for future reference and seasonal comparison.
+
+### 5. Technology Requirements
+
+* **Frontend Library:** React.js (via Vite)
+* **Backend Framework:** Node.js with Express.js
+* **Database:** Replit Postgres (PostgreSQL)
+* **AI Integration:** `@google/genai` SDK (Strictly utilizing Structured Outputs / JSON Schema)
+* **Validation:** Zod (for both frontend form validation and backend API request/response validation)
+* **Styling:** Tailwind CSS (with responsive design principles)
+
+### 6. Application Pages (Routes)
+
+* `/` - **Landing Page:** Value proposition, hero section, and "Get Started" CTA.
+* `/dashboard` - **Farm Manager:** Lists saved farm profiles and recent advisories.
+* `/farms/new` - **Farm Setup:** Form to input geographic and soil baseline data.
+* `/farms/:farmId/advisory/new` - **Advisory Generator:** Input current season, weather anomalies, and observed crop symptoms.
+* `/advisory/:advisoryId` - **Advisory Results:** Comprehensive dashboard displaying the AI-generated report.
+
+### 7. User Flow
+
+1. User arrives at the app and navigates to the dashboard.
+2. User registers a new Farm Plot, detailing soil type (e.g., Loamy, Clay), pH, and region.
+3. User requests a new Advisory for a specific farm plot by filling out a quick status form (season, budget, specific concerns like "yellowing leaves").
+4. Backend receives the request, constructs a highly specific prompt, and queries the Gemini API demanding a structured JSON response.
+5. AI processes the agronomic data and returns actionable insights.
+6. Backend saves the response to PostgreSQL and returns it to the client.
+7. Frontend renders the JSON response into beautiful, readable components.
+
+### 8. Target Domains & Categorization
+
+* **Soil Health Optimization:** Fertilizer recommendations, pH balancing strategies.
+* **Crop Suitability:** Primary and secondary crop recommendations with ROI potential.
+* **Climate Adaptation:** Irrigation schedules and extreme weather mitigation.
+* **Pathology:** Disease identification (via symptom text) and organic/chemical treatment paths.
+
+### 9. Form & Advisory Configuration
+
+**Farm Setup Form Fields:**
+
+* Farm Name (String)
+* Region/Location (String)
+* Soil Type (Enum: Clay, Sandy, Silty, Peaty, Chalky, Loamy)
+* Soil pH (Number, 0-14)
+* Annual Rainfall (Number, in mm)
+
+**Advisory Request Fields:**
+
+* Target Season (Enum: Spring, Summer, Autumn, Winter, Monsoon)
+* Current Crop (Optional String)
+* Specific Concerns/Symptoms (Text Area)
+* Farming Method (Enum: Conventional, Organic, Hydroponic)
+
+### 10. Database Schema (Production SQL for PostgreSQL)
+
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE farms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    region VARCHAR(255) NOT NULL,
+    soil_type VARCHAR(50) NOT NULL,
+    soil_ph DECIMAL(3,1) NOT NULL,
+    annual_rainfall_mm INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE advisories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    farm_id UUID REFERENCES farms(id) ON DELETE CASCADE,
+    target_season VARCHAR(50) NOT NULL,
+    concerns TEXT,
+    farming_method VARCHAR(50) NOT NULL,
+    ai_response JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_farms_user ON farms(user_id);
+CREATE INDEX idx_advisories_farm ON advisories(farm_id);
+
+```
+
+### 11. Row Level Security (RLS) / Data Isolation Rules
+
+* All backend API queries must explicitly scope database operations using a `user_id` (extracted from the session/auth token).
+* Example: `SELECT * FROM farms WHERE user_id = $1`
+* Ensure that when fetching an advisory, the system first validates that the associated `farm_id` belongs to the requesting `user_id`.
+
+### 12. Backend API Routes
+
+* `GET /api/farms` - Retrieve all farms for the active user.
+* `POST /api/farms` - Create a new farm profile.
+* `GET /api/farms/:farmId` - Get farm details.
+* `POST /api/advisory/generate` - Trigger the Gemini API. Payload requires `farmId`, `season`, `concerns`, `farming_method`.
+* `GET /api/advisory/:advisoryId` - Fetch a previously saved advisory.
+
+### 13. Gemini SDK Setup & Server-Side Security
+
+```javascript
+// Server-side initialization
+import { GoogleGenAI } from '@google/genai';
+
+// Initialize securely using environment variable
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// Ensure API key is NEVER exposed to the frontend. All Gemini calls MUST happen in the Node.js Express controllers.
+
+```
+
+### 14. AI System Prompt
+
+```text
+You are an elite, highly experienced Chief Agronomist and Agricultural Scientist. Your objective is to provide precise, scientifically accurate, and actionable farming advice based on specific localized data. You must analyze soil conditions, climate, and user concerns to recommend optimal crop rotations, disease treatments, and soil amendments. Always output strictly in the requested JSON format. Do not include markdown formatting like ```json in your response. Ensure all advice considers the requested farming method (e.g., strictly organic solutions if organic is requested).
+
+```
+
+### 15. Detailed AI Prompts (with required JSON Schemas)
+
+**User Prompt Construction:**
+`Analyze the following farm data and provide a comprehensive seasonal advisory. Farm: {farm.name}, Region: {farm.region}, Soil: {farm.soil_type} (pH: {farm.soil_ph}), Rainfall: {farm.annual_rainfall_mm}mm. Season: {request.season}. Farming Method: {request.farming_method}. User Concerns/Symptoms observed: {request.concerns}.`
+
+**Required JSON Schema for Gemini Output:**
+
+```javascript
+const advisorySchema = {
+  type: "OBJECT",
+  properties: {
+    recommended_crops: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          crop_name: { type: "STRING" },
+          suitability_score: { type: "INTEGER", description: "1-100" },
+          reasoning: { type: "STRING" }
+        },
+        required: ["crop_name", "suitability_score", "reasoning"]
+      }
+    },
+    soil_management: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+      description: "Actionable steps to improve the specific soil type and pH"
+    },
+    pest_disease_risks: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          threat_name: { type: "STRING" },
+          symptoms_to_watch: { type: "STRING" },
+          mitigation_strategy: { type: "STRING" }
+        },
+        required: ["threat_name", "symptoms_to_watch", "mitigation_strategy"]
+      }
+    },
+    executive_summary: { type: "STRING" }
+  },
+  required: ["recommended_crops", "soil_management", "pest_disease_risks", "executive_summary"]
+};
+
+```
+
+### 16. Zod Validation Requirements
+
+Implement Zod schemas in a shared `/common` or `/shared` folder accessible by both frontend and backend.
+
+* `FarmSchema`: Validates name (min 3 chars), region, soil type, pH (number between 0-14), rainfall (positive number).
+* `AdvisoryRequestSchema`: Validates farmId (UUID), season, concerns, method.
+* Wrap backend Express routes with a middleware that validates `req.body` against these Zod schemas before hitting controllers.
+
+### 17. Frontend Components List
+
+* `NavBar.jsx`: Global navigation.
+* `FarmCard.jsx`: Displays high-level farm stats (name, soil type, pH).
+* `DataInputForm.jsx`: Reusable form component using `react-hook-form` integrated with `@hookform/resolvers/zod`.
+* `AdvisoryDashboard.jsx`: The master view for the AI response.
+* `CropSuitabilityChart.jsx`: Visual representation of recommended crops and scores.
+* `ActionItemsList.jsx`: Renders the soil management and pest mitigation strategies with checkboxes.
+* `LoadingSpinner.jsx`: UI feedback during Gemini API generation.
+
+### 18. Security Requirements
+
+* **API Key Protection:** `GEMINI_API_KEY` must exist only on the backend in `.env`.
+* **Input Sanitization:** Sanitize all user inputs before passing them into the Gemini prompt to prevent prompt injection attacks.
+* **Rate Limiting:** Implement `express-rate-limit` on the `/api/advisory/generate` endpoint (e.g., max 5 requests per 15 minutes per IP) to control LLM costs.
+* **CORS:** Configure CORS in Express to only accept requests from the frontend origin.
+
+### 19. Environment Variables Template
+
+```env
+# Backend .env
+PORT=5000
+DATABASE_URL=postgresql://user:password@host:port/dbname
+GEMINI_API_KEY=your_google_gemini_api_key
+FRONTEND_URL=http://localhost:5173
+
+# Frontend .env
+VITE_API_BASE_URL=http://localhost:5000/api
+
+```
+
+### 20. Suggested Folder Structure
+
+```text
+/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/ (API call logic)
+│   │   ├── utils/
+│   │   └── App.jsx
+│   ├── package.json
+│   └── vite.config.js
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── db/ (Postgres connection pool)
+│   │   ├── middlewares/ (Zod validation, error handling)
+│   │   ├── routes/
+│   │   ├── services/ (Gemini integration logic)
+│   │   └── server.js
+│   └── package.json
+└── shared/
+    └── schemas/ (Zod schemas)
+
+```
+
+### 21. Implementation Phases
+
+* **Phase 1: Foundation:** Initialize monorepo, setup Vite React, Node/Express, and connect to PostgreSQL. Execute DB schema.
+* **Phase 2: Core CRUD:** Build Farm profile creation APIs, Zod validation, and Frontend Farm Dashboard.
+* **Phase 3: AI Engine:** Integrate `@google/genai` in the backend. Construct the prompt architecture and apply Structured Outputs mapping.
+* **Phase 4: Advisory UI:** Build the frontend forms to request advisories and the dashboard components to elegantly render the JSON payload.
+* **Phase 5: Polish & Security:** Apply Tailwind styling, handle loading states, implement rate limiting, and finalize error boundaries.
+
+### 22. Acceptance Criteria
+
+* The application launches without console errors.
+* A user can successfully create and save a farm profile to the Postgres database.
+* The application successfully triggers the Gemini API, retrieves a strictly formatted JSON response, and saves it to the database.
+* The frontend correctly parses the JSON payload and renders interactive, styled UI components (not raw text).
+* Invalid form submissions are caught gracefully by Zod validation on both the frontend and backend.
+* The architecture adheres strictly to the separation of concerns outlined above.
+
+### 23. Final Instruction to Coding Agent
+
+Begin by scaffolding the project structure as defined in Section 20. Initialize the frontend and backend environments, install all required dependencies (React, Express, `pg`, `@google/genai`, `zod`, `tailwindcss`), and establish the database connection pool. Execute step-by-step, providing the complete code for each file. Do not skip functionality or summarize code. Start immediately with Phase 1.
